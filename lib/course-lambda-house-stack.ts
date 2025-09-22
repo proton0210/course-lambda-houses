@@ -1,13 +1,21 @@
-import * as cdk from 'aws-cdk-lib';
+import * as cdk from "aws-cdk-lib";
+import { Construct } from "constructs";
 import * as cognito from "aws-cdk-lib/aws-cognito";
-import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-import * as iam from "aws-cdk-lib/aws-iam";
-import * as lambda from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
-import { Construct } from 'constructs';
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as appsync from "aws-cdk-lib/aws-appsync";
+import * as sqs from "aws-cdk-lib/aws-sqs";
+import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as cloudwatchActions from "aws-cdk-lib/aws-cloudwatch-actions";
+import * as sns from "aws-cdk-lib/aws-sns";
+import * as events from "aws-cdk-lib/aws-events";
+import * as eventsTargets from "aws-cdk-lib/aws-events-targets";
 import * as path from "path";
 export class CourseLambdaHouseStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -222,6 +230,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
         environment: {
           USER_TABLE_NAME: userTable.tableName,
           NODE_OPTIONS: "--enable-source-maps",
+          SES_SOURCE_EMAIL: "vidit0210@gmail.com",
         },
         timeout: cdk.Duration.seconds(10),
         memorySize: 256,
@@ -361,7 +370,9 @@ export class CourseLambdaHouseStack extends cdk.Stack {
     postConfirmationLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["cognito-idp:AdminAddUserToGroup"],
-        resources: [`arn:aws:cognito-idp:${this.region}:${this.account}:userpool/*`],
+        resources: [
+          `arn:aws:cognito-idp:${this.region}:${this.account}:userpool/*`,
+        ],
       })
     );
 
@@ -379,6 +390,224 @@ export class CourseLambdaHouseStack extends cdk.Stack {
     new cdk.CfnOutput(this, "UserPoolClientId", {
       value: userPoolClient.userPoolClientId,
       description: "Cognito User Pool Client ID",
+    });
+
+    //=====================================================
+    // APPSYNC API
+    // =====================================================
+    const api = new appsync.GraphqlApi(this, "PropertyApi", {
+      name: "lh-property-api",
+      schema: appsync.SchemaFile.fromAsset(
+        path.join(__dirname, "../schema.graphql")
+      ),
+      authorizationConfig: {
+        defaultAuthorization: {
+          authorizationType: appsync.AuthorizationType.USER_POOL,
+          userPoolConfig: {
+            userPool,
+          },
+        },
+      },
+      xrayEnabled: true,
+    });
+
+    new cdk.CfnOutput(this, "GraphqlApiUrl", {
+      value: api.graphqlUrl,
+      description: "AppSync GraphQL endpoint URL",
+    });
+
+    new cdk.CfnOutput(this, "GraphqlApiId", {
+      value: api.apiId,
+      description: "AppSync GraphQL API ID",
+    });
+    // =====================================================
+    // UPGRADE USER TO PAID TIER FUNCTIONALITY
+    // =====================================================
+
+    // Create Lambda functions for upgrade workflow
+    const updateCognitoGroupLambda = new NodejsFunction(
+      this,
+      "UpdateCognitoGroupLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/upgrade-user/update-cognito-group/handler.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node20",
+        },
+        environment: {
+          USER_POOL_ID: userPool.userPoolId,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(5),
+        memorySize: 128,
+      }
+    );
+
+    const updateUserTierLambda = new NodejsFunction(
+      this,
+      "UpdateUserTierLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/upgrade-user/update-user-tier/handler.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node20",
+        },
+        environment: {
+          USER_TABLE_NAME: userTable.tableName,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 256,
+      }
+    );
+
+    const sendProWelcomeEmailLambda = new NodejsFunction(
+      this,
+      "SendProWelcomeEmailLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/upgrade-user/send-pro-welcome-email/handler.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node20",
+        },
+        environment: {
+          USER_TABLE_NAME: userTable.tableName,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 256,
+      }
+    );
+
+    // Grant permissions
+    userTable.grantReadWriteData(updateUserTierLambda);
+    userTable.grantReadData(sendProWelcomeEmailLambda);
+
+    sendProWelcomeEmailLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ses:SendEmail", "ses:SendRawEmail"],
+        resources: [
+          `arn:aws:ses:${this.region}:${this.account}:identity/vidit0210@gmail.com`,
+        ],
+      })
+    );
+
+    // Grant permission to update Cognito groups
+    updateCognitoGroupLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "cognito-idp:AdminAddUserToGroup",
+          "cognito-idp:AdminRemoveUserFromGroup",
+        ],
+        resources: [userPool.userPoolArn],
+      })
+    );
+
+    // Create Step Functions tasks for upgrade workflow
+    const updateCognitoGroupTask = new tasks.LambdaInvoke(
+      this,
+      "UpdateCognitoGroupTask",
+      {
+        lambdaFunction: updateCognitoGroupLambda,
+        outputPath: "$.Payload",
+      }
+    );
+
+    const updateUserTierTask = new tasks.LambdaInvoke(
+      this,
+      "UpdateUserTierTask",
+      {
+        lambdaFunction: updateUserTierLambda,
+        outputPath: "$.Payload",
+      }
+    );
+
+    const sendProWelcomeEmailTask = new tasks.LambdaInvoke(
+      this,
+      "SendProWelcomeEmailTask",
+      {
+        lambdaFunction: sendProWelcomeEmailLambda,
+        outputPath: "$.Payload",
+        retryOnServiceExceptions: true,
+      }
+    );
+
+    // Define the upgrade user state machine
+    const upgradeUserDefinition = updateCognitoGroupTask
+      .next(updateUserTierTask)
+      .next(sendProWelcomeEmailTask);
+
+    const upgradeUserStateMachine = new sfn.StateMachine(
+      this,
+      "UpgradeUserStateMachine",
+      {
+        stateMachineName: "upgrade-user-to-paid-workflow",
+        definitionBody: sfn.DefinitionBody.fromChainable(upgradeUserDefinition),
+        timeout: cdk.Duration.minutes(5),
+      }
+    );
+
+    // Create AppSync resolver Lambda for upgrade user
+    const upgradeUserToPaidLambda = new NodejsFunction(
+      this,
+      "UpgradeUserToPaidLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/appsync-resolvers/upgrade-user-to-paid.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node20",
+        },
+        environment: {
+          USER_POOL_ID: userPool.userPoolId,
+          UPGRADE_USER_STATE_MACHINE_ARN:
+            upgradeUserStateMachine.stateMachineArn,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 256,
+      }
+    );
+
+    // Grant permission to start Step Functions execution
+    upgradeUserStateMachine.grantStartExecution(upgradeUserToPaidLambda);
+
+    // Create data source and resolver
+    const upgradeUserToPaidDataSource = api.addLambdaDataSource(
+      "UpgradeUserToPaidDataSource",
+      upgradeUserToPaidLambda
+    );
+
+    upgradeUserToPaidDataSource.createResolver("UpgradeUserToPaidResolver", {
+      typeName: "Mutation",
+      fieldName: "upgradeUserToPaid",
     });
   }
 }

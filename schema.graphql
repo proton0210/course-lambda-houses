@@ -1,0 +1,299 @@
+type User {
+  userId: ID!
+  cognitoUserId: String!
+  email: String!
+  firstName: String!
+  lastName: String!
+  contactNumber: String!
+  createdAt: AWSDateTime!
+  tier: String!
+}
+
+type Property {
+  id: ID!
+  title: String!
+  description: String!
+  price: Float!
+  address: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  bedrooms: Int!
+  bathrooms: Float!
+  squareFeet: Int!
+  propertyType: PropertyType!
+  listingType: ListingType!
+  images: [String!]!
+  imageUrls: [String!] # Signed URLs for frontend display
+  submittedBy: String # email or userId
+  submittedAt: AWSDateTime!
+  updatedAt: AWSDateTime!
+  status: PropertyStatus!
+  contactName: String!
+  contactEmail: String!
+  contactPhone: String!
+  amenities: [String!]
+  yearBuilt: Int
+  lotSize: Float
+  parkingSpaces: Int
+  isPublic: Boolean!
+}
+
+enum PropertyType {
+  SINGLE_FAMILY
+  CONDO
+  TOWNHOUSE
+  MULTI_FAMILY
+  LAND
+  COMMERCIAL
+  OTHER
+}
+
+enum ListingType {
+  FOR_SALE
+  FOR_RENT
+  SOLD
+  RENTED
+}
+
+enum PropertyStatus {
+  PENDING_REVIEW
+  ACTIVE
+  INACTIVE
+  REJECTED
+}
+
+type UploadUrl {
+  uploadUrl: String!
+  fileKey: String!
+}
+
+type PropertyConnection {
+  items: [Property!]!
+  nextToken: String
+}
+
+input CreatePropertyInput {
+  title: String!
+  description: String!
+  price: Float!
+  address: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  bedrooms: Int!
+  bathrooms: Float!
+  squareFeet: Int!
+  propertyType: PropertyType!
+  listingType: ListingType!
+  images: [String!]!
+  contactName: String!
+  contactEmail: String!
+  contactPhone: String!
+  amenities: [String!]
+  yearBuilt: Int
+  lotSize: Float
+  parkingSpaces: Int
+}
+
+input UpdatePropertyInput {
+  id: ID!
+  title: String
+  description: String
+  price: Float
+  address: String
+  city: String
+  state: String
+  zipCode: String
+  bedrooms: Int
+  bathrooms: Float
+  squareFeet: Int
+  propertyType: PropertyType
+  listingType: ListingType
+  images: [String!]
+  contactName: String
+  contactEmail: String
+  contactPhone: String
+  amenities: [String!]
+  yearBuilt: Int
+  lotSize: Float
+  parkingSpaces: Int
+  status: PropertyStatus
+}
+
+input PropertyFilterInput {
+  city: String
+  state: String
+  minPrice: Float
+  maxPrice: Float
+  minBedrooms: Int
+  minBathrooms: Float
+  propertyType: PropertyType
+  listingType: ListingType
+  status: PropertyStatus
+}
+
+type Query {
+  # All queries require authentication
+  getProperty(id: ID!): Property
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+  listProperties(
+    filter: PropertyFilterInput
+    limit: Int
+    nextToken: String
+  ): PropertyConnection! @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  # List user's own properties
+  listMyProperties(
+    userId: String!
+    limit: Int
+    nextToken: String
+  ): PropertyConnection! @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  # Get user details - users can view their own details, admins can view any user
+  getUserDetails(cognitoUserId: String!): User
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  # Get report generation status and signed URL
+  getReportStatus(executionArn: String!): ReportStatus!
+    @aws_auth(cognito_groups: ["paid", "admin"])
+
+  # Get all reports for the current user
+  listMyReports(limit: Int, nextToken: String): ReportConnection!
+    @aws_auth(cognito_groups: ["paid", "admin"])
+
+  # Admin only query to list pending properties
+  listPendingProperties(limit: Int, nextToken: String): PropertyConnection!
+    @aws_auth(cognito_groups: ["admin"])
+}
+
+type ReportConnection {
+  items: [UserReport!]!
+  nextToken: String
+}
+
+type UserReport {
+  reportId: String!
+  fileName: String!
+  reportType: String!
+  propertyTitle: String!
+  createdAt: AWSDateTime!
+  size: Int!
+  signedUrl: String!
+  s3Key: String!
+}
+
+type ReportStatus {
+  status: String!
+  reportId: String
+  signedUrl: String
+  s3Key: String
+  error: String
+}
+
+type PropertyUploadResponse {
+  propertyId: String!
+  message: String!
+  queueMessageId: String
+}
+
+type Mutation {
+  # All mutations require authentication
+  getUploadUrl(fileName: String!, contentType: String!): UploadUrl!
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  createProperty(input: CreatePropertyInput!): PropertyUploadResponse!
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  # Only property owner or admin can update/delete
+  updateProperty(input: UpdatePropertyInput!): Property!
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  deleteProperty(id: ID!): Property!
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  # Admin only mutations
+  approveProperty(id: ID!): Property! @aws_auth(cognito_groups: ["admin"])
+
+  rejectProperty(id: ID!, reason: String!): Property!
+    @aws_auth(cognito_groups: ["admin"])
+
+  # Upgrade user to paid tier
+  upgradeUserToPaid(cognitoUserId: String!): UpgradeUserResponse!
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+
+  # Generate AI property report (Pro users only)
+  generatePropertyReport(input: GenerateReportInput!): PropertyReport!
+    @aws_auth(cognito_groups: ["paid", "admin"])
+}
+
+type UpgradeUserResponse {
+  success: Boolean!
+  message: String!
+  executionArn: String
+}
+
+input GenerateReportInput {
+  # Property details
+  title: String!
+  description: String!
+  price: Float!
+  address: String!
+  city: String!
+  state: String!
+  zipCode: String!
+  bedrooms: Int!
+  bathrooms: Float!
+  squareFeet: Int!
+  propertyType: PropertyType!
+  listingType: ListingType!
+  yearBuilt: Int
+  lotSize: Float
+  amenities: [String!]
+
+  # Report customization
+  reportType: ReportType!
+  additionalContext: String
+  includeDetailedAmenities: Boolean
+
+  # User identification (optional - will use current user if not provided)
+  cognitoUserId: String
+}
+
+enum ReportType {
+  MARKET_ANALYSIS
+  INVESTMENT_ANALYSIS
+  COMPARATIVE_MARKET_ANALYSIS
+  LISTING_OPTIMIZATION
+  CUSTOM
+}
+
+type PropertyReport {
+  reportId: ID!
+  reportType: ReportType!
+  generatedAt: AWSDateTime!
+  content: String!
+  propertyTitle: String!
+  executiveSummary: String
+  marketInsights: String
+  recommendations: String
+  metadata: ReportMetadata
+  signedUrl: String
+  s3Key: String
+  executionArn: String
+}
+
+type ReportMetadata {
+  modelUsed: String!
+  generationTimeMs: Int!
+  wordCount: Int
+}
+
+type Subscription {
+  # Subscription removed since createProperty now returns PropertyUploadResponse
+  # You can subscribe to property status changes if needed
+
+  onPropertyUpdated: Property
+    @aws_subscribe(mutations: ["updateProperty"])
+    @aws_auth(cognito_groups: ["user", "paid", "admin"])
+}
