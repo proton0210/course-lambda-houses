@@ -274,6 +274,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
         memorySize: 256,
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
+          SES_SOURCE_EMAIL: "vidit0210@gmail.com",
         },
       }
     );
@@ -281,6 +282,15 @@ export class CourseLambdaHouseStack extends cdk.Stack {
     // Grant permissions
     userTable.grantWriteData(createDynamoDBUserLambda);
     userFilesBucket.grantWrite(createS3FolderLambda);
+
+    sendWelcomeEmailLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ses:SendEmail", "ses:SendRawEmail"],
+        resources: [
+          `arn:aws:ses:${this.region}:${this.account}:identity/vidit0210@gmail.com`,
+        ],
+      })
+    );
 
     // Create Step Functions tasks
     const generateUserIdTask = new tasks.LambdaInvoke(
@@ -338,7 +348,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       "UserCreationStateMachine",
       {
         stateMachineName: "user-creation-workflow",
-        definition,
+        definitionBody: sfn.DefinitionBody.fromChainable(definition),
         timeout: cdk.Duration.minutes(5),
       }
     );
@@ -360,5 +370,15 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       "USER_CREATION_STATE_MACHINE_ARN",
       userCreationStateMachine.stateMachineArn
     );
+
+    new cdk.CfnOutput(this, "UserPoolId", {
+      value: userPool.userPoolId,
+      description: "Cognito User Pool ID",
+    });
+
+    new cdk.CfnOutput(this, "UserPoolClientId", {
+      value: userPoolClient.userPoolClientId,
+      description: "Cognito User Pool Client ID",
+    });
   }
 }
