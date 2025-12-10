@@ -30,6 +30,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           sourceMap: true,
           sourcesContent: false,
           target: "node22",
+          forceDockerBundling: false,
         },
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
@@ -193,6 +194,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           sourceMap: true,
           sourcesContent: false,
           target: "node22",
+          forceDockerBundling: false,
         },
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
@@ -217,6 +219,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           sourceMap: true,
           sourcesContent: false,
           target: "node22",
+          forceDockerBundling: false,
         },
         environment: {
           USER_TABLE_NAME: userTable.tableName,
@@ -242,6 +245,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           sourceMap: true,
           sourcesContent: false,
           target: "node22",
+          forceDockerBundling: false,
         },
         environment: {
           USER_FILES_BUCKET_NAME: userFilesBucket.bucketName,
@@ -268,6 +272,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           sourceMap: true,
           sourcesContent: false,
           target: "node22",
+          forceDockerBundling: false,
         },
         timeout: cdk.Duration.seconds(10),
         memorySize: 256,
