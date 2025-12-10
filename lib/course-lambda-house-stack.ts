@@ -19,7 +19,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "PostConfirmationLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -29,7 +29,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
@@ -182,7 +182,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "GenerateUserIdLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -192,7 +192,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
@@ -206,7 +206,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "CreateDynamoDBUserLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -216,7 +216,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           USER_TABLE_NAME: userTable.tableName,
@@ -231,7 +231,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "CreateS3FolderLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -241,7 +241,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           USER_FILES_BUCKET_NAME: userFilesBucket.bucketName,
@@ -257,7 +257,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "SendWelcomeEmailLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -267,7 +267,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         timeout: cdk.Duration.seconds(10),
         memorySize: 256,
