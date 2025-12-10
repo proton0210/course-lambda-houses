@@ -9,6 +9,7 @@ import * as sfn from "aws-cdk-lib/aws-stepfunctions";
 import * as tasks from "aws-cdk-lib/aws-stepfunctions-tasks";
 import { Construct } from 'constructs';
 import * as path from "path";
+import * as appsync from "aws-cdk-lib/aws-appsync";
 export class CourseLambdaHouseStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -19,7 +20,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "PostConfirmationLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -29,7 +30,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
@@ -182,7 +183,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "GenerateUserIdLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -192,7 +193,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           NODE_OPTIONS: "--enable-source-maps",
@@ -206,7 +207,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "CreateDynamoDBUserLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -216,7 +217,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           USER_TABLE_NAME: userTable.tableName,
@@ -231,7 +232,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "CreateS3FolderLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -241,7 +242,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         environment: {
           USER_FILES_BUCKET_NAME: userFilesBucket.bucketName,
@@ -257,7 +258,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       this,
       "SendWelcomeEmailLambda",
       {
-        runtime: lambda.Runtime.NODEJS_20_X,
+        runtime: lambda.Runtime.NODEJS_22_X,
         handler: "handler",
         entry: path.join(
           __dirname,
@@ -267,7 +268,7 @@ export class CourseLambdaHouseStack extends cdk.Stack {
           minify: true,
           sourceMap: true,
           sourcesContent: false,
-          target: "node20",
+          target: "node22",
         },
         timeout: cdk.Duration.seconds(10),
         memorySize: 256,
@@ -370,6 +371,317 @@ export class CourseLambdaHouseStack extends cdk.Stack {
       userCreationStateMachine.stateMachineArn
     );
 
+    // =====================================================
+    // APPSYNC API FOR REAL ESTATE PROPERTIES
+    // =====================================================
+
+    // Create AppSync API
+    const api = new appsync.GraphqlApi(this, "PropertyApi", {
+      name: "lh-property-api",
+      schema: appsync.SchemaFile.fromAsset(
+        path.join(__dirname, "../schema.graphql")
+      ),
+      authorizationConfig: {
+        defaultAuthorization: {
+          authorizationType: appsync.AuthorizationType.USER_POOL,
+          userPoolConfig: {
+            userPool,
+          },
+        },
+      },
+      xrayEnabled: true,
+    });
+
+    // Create DynamoDB Table for Properties
+    const propertiesTable = new dynamodb.Table(this, "PropertiesTable", {
+      tableName: "lh-properties",
+      partitionKey: {
+        name: "pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "sk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      pointInTimeRecovery: true,
+    });
+
+    // Add Global Secondary Indexes for querying
+    propertiesTable.addGlobalSecondaryIndex({
+      indexName: "gsi1",
+      partitionKey: {
+        name: "gsi1pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "gsi1sk",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    propertiesTable.addGlobalSecondaryIndex({
+      indexName: "gsi2",
+      partitionKey: {
+        name: "gsi2pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "gsi2sk",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    propertiesTable.addGlobalSecondaryIndex({
+      indexName: "gsi3",
+      partitionKey: {
+        name: "gsi3pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "gsi3sk",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    propertiesTable.addGlobalSecondaryIndex({
+      indexName: "gsi4",
+      partitionKey: {
+        name: "gsi4pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "gsi4sk",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    propertiesTable.addGlobalSecondaryIndex({
+      indexName: "gsi5",
+      partitionKey: {
+        name: "gsi5pk",
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: {
+        name: "gsi5sk",
+        type: dynamodb.AttributeType.STRING,
+      },
+    });
+
+    // Create S3 Bucket for Property Images
+    const propertyImagesBucket = new s3.Bucket(this, "PropertyImagesBucket", {
+      bucketName: `lh-property-images-${this.account}-${this.region}`,
+      versioned: true,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      cors: [
+        {
+          allowedHeaders: ["*"],
+          allowedMethods: [
+            s3.HttpMethods.GET,
+            s3.HttpMethods.PUT,
+            s3.HttpMethods.POST,
+            s3.HttpMethods.DELETE,
+          ],
+          allowedOrigins: ["*"],
+          exposedHeaders: ["ETag"],
+          maxAge: 3000,
+        },
+      ],
+      lifecycleRules: [
+        {
+          id: "delete-old-versions",
+          noncurrentVersionExpiration: cdk.Duration.days(30),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+      ],
+    });
+
+
+
+    // =====================================================
+    // UPGRADE USER TO PAID TIER FUNCTIONALITY
+    // =====================================================
+
+    // Create Lambda functions for upgrade workflow
+    const updateCognitoGroupLambda = new NodejsFunction(
+      this,
+      "UpdateCognitoGroupLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/upgrade-user/update-cognito-group/handler.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node22",
+        },
+        environment: {
+          USER_POOL_ID: userPool.userPoolId,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(5),
+        memorySize: 128,
+      }
+    );
+
+    const updateUserTierLambda = new NodejsFunction(
+      this,
+      "UpdateUserTierLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/upgrade-user/update-user-tier/handler.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node22",
+        },
+        environment: {
+          USER_TABLE_NAME: userTable.tableName,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 256,
+      }
+    );
+
+    const sendProWelcomeEmailLambda = new NodejsFunction(
+      this,
+      "SendProWelcomeEmailLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/upgrade-user/send-pro-welcome-email/handler.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node22",
+        },
+        environment: {
+          USER_TABLE_NAME: userTable.tableName,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 256,
+      }
+    );
+
+    // Grant permissions
+    userTable.grantReadWriteData(updateUserTierLambda);
+    userTable.grantReadData(sendProWelcomeEmailLambda);
+
+    // Grant permission to update Cognito groups
+    updateCognitoGroupLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "cognito-idp:AdminAddUserToGroup",
+          "cognito-idp:AdminRemoveUserFromGroup"
+        ],
+        resources: [userPool.userPoolArn],
+      })
+    );
+
+    // Create Step Functions tasks for upgrade workflow
+    const updateCognitoGroupTask = new tasks.LambdaInvoke(
+      this,
+      "UpdateCognitoGroupTask",
+      {
+        lambdaFunction: updateCognitoGroupLambda,
+        outputPath: "$.Payload",
+      }
+    );
+
+    const updateUserTierTask = new tasks.LambdaInvoke(
+      this,
+      "UpdateUserTierTask",
+      {
+        lambdaFunction: updateUserTierLambda,
+        outputPath: "$.Payload",
+      }
+    );
+
+    const sendProWelcomeEmailTask = new tasks.LambdaInvoke(
+      this,
+      "SendProWelcomeEmailTask",
+      {
+        lambdaFunction: sendProWelcomeEmailLambda,
+        outputPath: "$.Payload",
+        retryOnServiceExceptions: true,
+      }
+    );
+
+    // Define the upgrade user state machine
+    const upgradeUserDefinition = updateCognitoGroupTask
+      .next(updateUserTierTask)
+      .next(sendProWelcomeEmailTask);
+
+    const upgradeUserStateMachine = new sfn.StateMachine(
+      this,
+      "UpgradeUserStateMachine",
+      {
+        stateMachineName: "upgrade-user-to-paid-workflow",
+        definition: upgradeUserDefinition,
+        timeout: cdk.Duration.minutes(5),
+      }
+    );
+
+    // Create AppSync resolver Lambda for upgrade user
+    const upgradeUserToPaidLambda = new NodejsFunction(
+      this,
+      "UpgradeUserToPaidLambda",
+      {
+        runtime: lambda.Runtime.NODEJS_22_X,
+        handler: "handler",
+        entry: path.join(
+          __dirname,
+          "../functions/appsync-resolvers/upgrade-user-to-paid.ts"
+        ),
+        bundling: {
+          minify: true,
+          sourceMap: true,
+          sourcesContent: false,
+          target: "node22",
+        },
+        environment: {
+          USER_POOL_ID: userPool.userPoolId,
+          UPGRADE_USER_STATE_MACHINE_ARN: upgradeUserStateMachine.stateMachineArn,
+          NODE_OPTIONS: "--enable-source-maps",
+        },
+        timeout: cdk.Duration.seconds(10),
+        memorySize: 256,
+      }
+    );
+
+    // Grant permission to start Step Functions execution
+    upgradeUserStateMachine.grantStartExecution(upgradeUserToPaidLambda);
+
+    // Create data source and resolver
+    const upgradeUserToPaidDataSource = api.addLambdaDataSource(
+      "UpgradeUserToPaidDataSource",
+      upgradeUserToPaidLambda
+    );
+
+    upgradeUserToPaidDataSource.createResolver("UpgradeUserToPaidResolver", {
+      typeName: "Mutation",
+      fieldName: "upgradeUserToPaid",
+    });
+
     new cdk.CfnOutput(this, "UserPoolId", {
       value: userPool.userPoolId,
       description: "Cognito User Pool ID",
@@ -378,6 +690,22 @@ export class CourseLambdaHouseStack extends cdk.Stack {
     new cdk.CfnOutput(this, "UserPoolClientId", {
       value: userPoolClient.userPoolClientId,
       description: "Cognito User Pool Client ID",
+    });
+
+    // AppSync API Outputs
+    new cdk.CfnOutput(this, "GraphQLApiUrl", {
+      value: api.graphqlUrl,
+      description: "The URL of the GraphQL API",
+    });
+
+    new cdk.CfnOutput(this, "PropertiesTableName", {
+      value: propertiesTable.tableName,
+      description: "The name of the Properties DynamoDB table",
+    });
+
+    new cdk.CfnOutput(this, "PropertyImagesBucketName", {
+      value: propertyImagesBucket.bucketName,
+      description: "The name of the Property Images S3 bucket",
     });
   }
 }
