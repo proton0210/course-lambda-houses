@@ -13,7 +13,6 @@ export class CourseLambdaHouseStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    //MA
 
     // Create PostConfirmation Lambda function
     const postConfirmationLambda = new NodejsFunction(
